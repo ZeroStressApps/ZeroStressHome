@@ -16,7 +16,7 @@
       <div class="brand-lockup"><img src="./logo-192.png" alt="ZeroStressHome" class="brand-logo"><div>
         <div class="eyebrow">CASA MADRID</div>
         <h1>ZeroStressHome</h1>
-        <p class="subtitle">Bravo Murillo 307 5F · calendario compartido</p>
+        <p class="subtitle">Bravo Murillo 307 · calendario compartido</p>
       </div></div>
       <button id="logoutBtn" class="ghost hidden">Salir</button>
     </header>
@@ -107,12 +107,22 @@
       </div>
 
       <div class="card selected-card">
-        <div>
-          <div class="eyebrow">SELECCIÓN</div>
-          <h2 id="selectionTitle">Elige un día</h2>
-          <p id="selectionHint">Toca un día para reservarlo. Si ya es tuyo, puedes quitarlo.</p>
+        <div class="selection-content">
+          <div>
+            <div class="eyebrow">TU ESTANCIA</div>
+            <h2 id="selectionTitle">Elige una estancia</h2>
+            <p id="selectionHint">Selecciona el primer día y después el último, como en una reserva de hotel.</p>
+          </div>
+          <div class="date-range">
+            <label>Desde
+              <input id="startDateInput" type="date">
+            </label>
+            <label>Hasta
+              <input id="endDateInput" type="date">
+            </label>
+          </div>
         </div>
-        <button id="toggleDayBtn" class="primary" disabled>Reservar día</button>
+        <button id="toggleDayBtn" class="primary" disabled>Elige desde y hasta</button>
       </div>
 
       <div class="card reservations-card">

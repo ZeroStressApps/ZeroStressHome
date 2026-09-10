@@ -73,3 +73,7 @@ Esta base está preparada para añadir posteriormente:
 - historial,
 - notificaciones,
 - y sincronización más avanzada.
+
+
+## Reservas por estancia
+Las reservas se seleccionan con **Desde** y **Hasta**. Ambos días se consideran incluidos. También se puede elegir el rango directamente tocando primero el día de inicio y después el día final en el calendario.

@@ -5,7 +5,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
 import {
   getFirestore, doc, setDoc, getDoc, collection, query, orderBy,
-  onSnapshot, serverTimestamp, deleteDoc, updateDoc, arrayUnion
+  onSnapshot, serverTimestamp, deleteDoc, updateDoc, arrayUnion, writeBatch
 } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
 
@@ -16,7 +16,8 @@ const db = getFirestore(app);
 const $ = (id) => document.getElementById(id);
 const state = {
   user: null, homeId: null, home: null, reservations: [],
-  current: new Date(), selected: null, unsubscribe: null, authMode: "login"
+  current: new Date(), selected: null, selectedStart: null, selectedEnd: null,
+  unsubscribe: null, authMode: "login"
 };
 
 const months = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
@@ -126,6 +127,33 @@ function reservationFor(date){
   return state.reservations.find(r=>r.date===date);
 }
 
+function isBetween(k,start,end){
+  if(!start || !end) return false;
+  return k>=start && k<=end;
+}
+
+function daysBetweenInclusive(start,end){
+  const out=[];
+  if(!start || !end) return out;
+  let d=dateFromKey(start), last=dateFromKey(end);
+  while(d<=last){
+    out.push(keyDate(d));
+    d.setDate(d.getDate()+1);
+  }
+  return out;
+}
+
+function formatRange(start,end){
+  if(!start) return "Elige desde cuándo estarás";
+  if(!end) return `Desde ${prettyDate(start)} · elige hasta cuándo`;
+  if(start===end) return prettyDate(start);
+  const a=dateFromKey(start), b=dateFromKey(end);
+  if(a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth()){
+    return `${a.getDate()}–${b.getDate()} de ${months[a.getMonth()]}`;
+  }
+  return `${a.getDate()} ${months[a.getMonth()]} – ${b.getDate()} ${months[b.getMonth()]}`;
+}
+
 function renderCalendar(){
   const d=state.current, y=d.getFullYear(), m=d.getMonth();
   $("monthTitle").textContent=`${months[m][0].toUpperCase()+months[m].slice(1)} ${y}`;
@@ -137,7 +165,12 @@ function renderCalendar(){
     const date=new Date(y,m,n), k=keyDate(date), r=reservationFor(k);
     const mine=r?.users?.includes(state.user.uid), other=r && !mine;
     const overlap=r?.users?.length>1;
-    const cls=["day",mine?"mine-day":"",other?"other-day":"",overlap?"overlap-day":"",state.selected===k?"selected":"",k===keyDate(new Date())?"today":""].filter(Boolean).join(" ");
+    const inRange=isBetween(k,state.selectedStart,state.selectedEnd);
+    const rangeStart=state.selectedStart===k;
+    const rangeEnd=state.selectedEnd===k;
+    const cls=["day",mine?"mine-day":"",other?"other-day":"",overlap?"overlap-day":"",
+      inRange?"in-range":"",rangeStart?"range-start":"",rangeEnd?"range-end":"",
+      state.selected===k?"selected":"",k===keyDate(new Date())?"today":""].filter(Boolean).join(" ");
     const label=r?.users?.map(uid=>uid===state.user.uid?"Tú":(state.home.memberNames?.[uid]||"Otra persona")).join(" + ");
     html+=`<button class="${cls}" data-date="${k}"><span>${n}</span>${label?`<small>${escapeHtml(label)}</small>`:""}</button>`;
   }
@@ -146,64 +179,150 @@ function renderCalendar(){
   updateSelection();
 }
 
-function selectDate(k){
-  state.selected=k;
-  updateSelection();
-  renderCalendar();
-}
-function updateSelection(){
-  const r=state.selected&&reservationFor(state.selected);
-  $("selectionTitle").textContent=state.selected?prettyDate(state.selected):"Elige un día";
-  const mine=r?.users?.includes(state.user.uid);
-  const other=r && !mine;
-  const overlap=r?.users?.length>1;
-  if(!state.selected){$("toggleDayBtn").disabled=true;return;}
-  $("toggleDayBtn").disabled=false;
-  $("toggleDayBtn").textContent=mine?(overlap?"Quitar mi reserva":"Cancelar día"):(other?"Reservar también":"Reservar día");
-  $("selectionHint").textContent=overlap?"Estaréis los dos en casa ese día.":other?"La otra persona ya estará. Puedes reservar el mismo día.":"Toca el botón para indicar que estarás en casa.";
+function syncDateInputs(){
+  $("startDateInput").value=state.selectedStart||"";
+  $("endDateInput").value=state.selectedEnd||"";
+  $("endDateInput").min=state.selectedStart||"";
 }
 
+function selectDate(k){
+  if(!state.selectedStart || (state.selectedStart && state.selectedEnd)){
+    state.selectedStart=k;
+    state.selectedEnd=null;
+    state.selected=k;
+  } else {
+    if(k<state.selectedStart){
+      state.selectedEnd=state.selectedStart;
+      state.selectedStart=k;
+    } else {
+      state.selectedEnd=k;
+    }
+    state.selected=k;
+  }
+  syncDateInputs();
+  renderCalendar();
+}
+
+function updateSelection(){
+  const start=state.selectedStart, end=state.selectedEnd;
+  const complete=!!(start && end);
+  const count=complete?daysBetweenInclusive(start,end).length:(start?1:0);
+  $("selectionTitle").textContent=complete?formatRange(start,end):(start?formatRange(start,null):"Elige una estancia");
+  $("selectionHint").textContent=!start
+    ?"Selecciona el primer día y después el último, como en una reserva de hotel."
+    :!end
+      ?"Ahora selecciona el último día de tu estancia. Los dos días se incluyen."
+      :`${count} ${count===1?"día":"días"} seleccionados. Si ya hay otra persona en alguno, podréis coincidir.`;
+  $("toggleDayBtn").disabled=!complete;
+  $("toggleDayBtn").textContent=complete?`Reservar ${count} ${count===1?"día":"días"}`:"Elige desde y hasta";
+  syncDateInputs();
+}
+
+$("startDateInput").addEventListener("change",()=>{
+  const k=$("startDateInput").value;
+  if(!k) return;
+  state.selectedStart=k;
+  if(state.selectedEnd && state.selectedEnd<k) state.selectedEnd=null;
+  state.selected=k;
+  state.current=dateFromKey(k);
+  renderCalendar();
+});
+
+$("endDateInput").addEventListener("change",()=>{
+  const k=$("endDateInput").value;
+  if(!k) return;
+  if(!state.selectedStart){
+    state.selectedStart=k;
+    state.selectedEnd=k;
+  } else if(k<state.selectedStart){
+    state.selectedEnd=state.selectedStart;
+    state.selectedStart=k;
+  } else {
+    state.selectedEnd=k;
+  }
+  state.selected=k;
+  state.current=dateFromKey(k);
+  renderCalendar();
+});
+
 $("toggleDayBtn").addEventListener("click",async()=>{
-  if(!state.selected) return;
-  const k=state.selected, ref=doc(db,"homes",state.homeId,"reservations",k), r=reservationFor(k);
+  const start=state.selectedStart, end=state.selectedEnd;
+  if(!start || !end) return;
+  const days=daysBetweenInclusive(start,end);
+  const batch=writeBatch(db);
   try{
-    if(!r){
-      await setDoc(ref,{date:k,users:[state.user.uid],updatedAt:serverTimestamp()});
-      showStatus("Día reservado.");
-    }else{
-      const users=r.users||[];
-      if(users.includes(state.user.uid)){
-        const next=users.filter(x=>x!==state.user.uid);
-        if(next.length) await updateDoc(ref,{users:next,updatedAt:serverTimestamp()});
-        else await deleteDoc(ref);
-        showStatus("Tu reserva se ha quitado.");
-      }else{
-        await updateDoc(ref,{users:[...users,state.user.uid],updatedAt:serverTimestamp()});
-        showStatus("Día compartido. Los dos estaréis en casa.");
+    for(const k of days){
+      const ref=doc(db,"homes",state.homeId,"reservations",k);
+      batch.set(ref,{date:k,users:arrayUnion(state.user.uid),updatedAt:serverTimestamp()},{merge:true});
+    }
+    await batch.commit();
+    const count=days.length;
+    showStatus(`${count} ${count===1?"día reservado":"días reservados"}.`);
+  }catch(err){
+    showStatus(friendlyError(err),true);
+  }
+});
+
+function groupReservations(rows){
+  const sorted=[...rows].sort((a,b)=>a.date.localeCompare(b.date));
+  const groups=[];
+  for(const r of sorted){
+    const users=(r.users||[]).slice().sort().join("|");
+    const last=groups[groups.length-1];
+    if(last && last.usersKey===users){
+      const next=dateFromKey(last.end);
+      next.setDate(next.getDate()+1);
+      if(keyDate(next)===r.date){
+        last.end=r.date;
+        continue;
       }
     }
-  }catch(err){showStatus(friendlyError(err),true);}
-});
+    groups.push({start:r.date,end:r.date,usersKey:users,users:r.users||[]});
+  }
+  return groups;
+}
 
 function renderList(){
   const today=keyDate(new Date());
   const upcoming=state.reservations.filter(r=>r.date>=today);
+  const groups=groupReservations(upcoming);
   $("reservationCount").textContent=upcoming.length;
-  if(!upcoming.length){$("reservationList").innerHTML=`<p class="empty-state">Todavía no hay días reservados. La humanidad puede sobrevivir a esto.</p>`;return;}
-  $("reservationList").innerHTML=upcoming.slice(0,30).map(r=>{
-    const names=(r.users||[]).map(uid=>uid===state.user.uid?"Tú":(state.home.memberNames?.[uid]||"Otra persona"));
-    return `<button class="reservation-row" data-date="${r.date}">
-      <span class="date-box"><b>${dateFromKey(r.date).getDate()}</b><small>${months[dateFromKey(r.date).getMonth()].slice(0,3)}</small></span>
-      <span><strong>${escapeHtml(names.join(" + "))}</strong><small>${escapeHtml(prettyDate(r.date))}</small></span>
+  if(!groups.length){
+    $("reservationList").innerHTML=`<p class="empty-state">Todavía no hay días reservados. La humanidad puede sobrevivir a esto.</p>`;
+    return;
+  }
+  $("reservationList").innerHTML=groups.slice(0,30).map(g=>{
+    const names=g.users.map(uid=>uid===state.user.uid?"Tú":(state.home.memberNames?.[uid]||"Otra persona"));
+    const first=dateFromKey(g.start);
+    return `<button class="reservation-row" data-date="${g.start}">
+      <span class="date-box"><b>${first.getDate()}</b><small>${months[first.getMonth()].slice(0,3)}</small></span>
+      <span><strong>${escapeHtml(names.join(" + "))}</strong><small>${escapeHtml(formatRange(g.start,g.end))}</small></span>
       <span>›</span>
     </button>`;
   }).join("");
-  document.querySelectorAll(".reservation-row").forEach(b=>b.addEventListener("click",()=>selectDate(b.dataset.date)));
+  document.querySelectorAll(".reservation-row").forEach(b=>b.addEventListener("click",()=>{
+    const k=b.dataset.date;
+    const group=groups.find(g=>g.start===k);
+    if(group){
+      state.selectedStart=group.start;
+      state.selectedEnd=group.end;
+      state.selected=group.start;
+      state.current=dateFromKey(group.start);
+      renderCalendar();
+    }
+  }));
 }
 
 $("prevMonth").addEventListener("click",()=>{state.current.setMonth(state.current.getMonth()-1);renderCalendar();});
 $("nextMonth").addEventListener("click",()=>{state.current.setMonth(state.current.getMonth()+1);renderCalendar();});
-$("todayBtn").addEventListener("click",()=>{state.current=new Date();state.selected=keyDate(new Date());renderCalendar();});
+$("todayBtn").addEventListener("click",()=>{
+  const today=keyDate(new Date());
+  state.current=new Date();
+  state.selectedStart=today;
+  state.selectedEnd=today;
+  state.selected=today;
+  renderCalendar();
+});
 $("copyCodeBtn").addEventListener("click",async()=>{
   await navigator.clipboard.writeText(state.homeId);
   showStatus("Código copiado.");

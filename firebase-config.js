@@ -1,10 +1,9 @@
-// Rellena estos valores con los de tu proyecto Firebase.
-// Firebase Console → Project settings → Your apps → Web app.
+// Configuración de Firebase para ZeroStressHome
 export const firebaseConfig = {
-  apiKey: "PEGA_AQUI_TU_API_KEY",
-  authDomain: "PEGA_AQUI.firebaseapp.com",
-  projectId: "PEGA_AQUI",
-  storageBucket: "PEGA_AQUI.firebasestorage.app",
-  messagingSenderId: "PEGA_AQUI",
-  appId: "PEGA_AQUI"
+  apiKey: "AIzaSyCCyN5ZHPe9yWTK1LtaZQ2UPmprapUGtOA",
+  authDomain: "zerostresshome.firebaseapp.com",
+  projectId: "zerostresshome",
+  storageBucket: "zerostresshome.firebasestorage.app",
+  messagingSenderId: "19517794753",
+  appId: "1:19517794753:web:963f74afc1936832f7e740"
 };

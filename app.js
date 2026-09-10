@@ -6,7 +6,8 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
 import {
   getFirestore, doc, setDoc, getDoc, collection, query, orderBy,
-  onSnapshot, serverTimestamp, deleteDoc, updateDoc, arrayUnion, writeBatch
+  onSnapshot, serverTimestamp, deleteDoc, updateDoc, arrayUnion, writeBatch,
+  where, addDoc
 } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
 
@@ -24,9 +25,10 @@ if (savedEmail) $("emailInput").value = savedEmail;
 
 const $ = (id) => document.getElementById(id);
 const state = {
-  user: null, homeId: null, home: null, reservations: [],
+  user: null, homeId: null, home: null, reservations: [], expenses: [],
   current: new Date(), selected: null, selectedStart: null, selectedEnd: null,
-  unsubscribe: null, authMode: "login"
+  unsubscribe: null, expenseUnsubscribe: null, authMode: "login",
+  expenseMonth: new Date()
 };
 
 const months = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
@@ -130,6 +132,7 @@ async function enterHome(id){
   $("homeCode").textContent=id;
   $("homeTitle").textContent=state.home.name||"ZeroStressHome";
   subscribeReservations();
+  subscribeExpenses();
   renderCalendar();
 }
 
@@ -280,6 +283,128 @@ $("toggleDayBtn").addEventListener("click",async()=>{
   }catch(err){
     showStatus(friendlyError(err),true);
   }
+});
+
+
+function expenseMonthKey(d=state.expenseMonth){
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+}
+
+function expenseMonthLabel(d=state.expenseMonth){
+  return `${months[d.getMonth()][0].toUpperCase()+months[d.getMonth()].slice(1)} ${d.getFullYear()}`;
+}
+
+function formatMoney(n){
+  return Number(n||0).toLocaleString("es-ES",{minimumFractionDigits:2,maximumFractionDigits:2})+" €";
+}
+
+function subscribeExpenses(){
+  if(state.expenseUnsubscribe) state.expenseUnsubscribe();
+  const q=query(
+    collection(db,"homes",state.homeId,"expenses"),
+    orderBy("date","desc")
+  );
+  state.expenseUnsubscribe=onSnapshot(q,snap=>{
+    state.expenses=snap.docs.map(d=>({id:d.id,...d.data()}));
+    renderExpenses();
+  },err=>showStatus(friendlyError(err),true));
+}
+
+function renderExpenses(){
+  const key=expenseMonthKey();
+  $("expensesMonthTitle").textContent=`Gastos de ${expenseMonthLabel()}`;
+  const rows=(state.expenses||[]).filter(e=>(e.month||String(e.date||"").slice(0,7))===key);
+  const total=rows.reduce((sum,e)=>sum+Number(e.amount||0),0);
+  const half=total/2;
+  $("expensesTotal").textContent=formatMoney(total);
+  $("expensesHalf").textContent=`${formatMoney(half)} cada una`;
+
+  const members=state.home?.members||[];
+  const memberNames=state.home?.memberNames||{};
+  const contributions={};
+  members.forEach(uid=>contributions[uid]=0);
+  rows.forEach(e=>{
+    if(e.paidBy) contributions[e.paidBy]=(contributions[e.paidBy]||0)+Number(e.amount||0);
+  });
+
+  const balanceEl=$("expenseBalance");
+  if(!rows.length){
+    balanceEl.innerHTML=`<span>Liquidación</span><strong>Sin gastos todavía</strong>`;
+    $("expenseList").innerHTML=`<p class="empty-state">Todavía no hay gastos este mes.</p>`;
+    return;
+  }
+
+  if(members.length>=2){
+    const a=members[0], b=members[1];
+    const diff=(contributions[a]||0)-half;
+    let text="Está todo a medias";
+    if(Math.abs(diff)>0.005){
+      const debtor=diff>0?b:a;
+      const creditor=diff>0?a:b;
+      const debtorName=debtor===state.user.uid?"Tú":(memberNames[debtor]||"La otra persona");
+      const creditorName=creditor===state.user.uid?"tú":(memberNames[creditor]||"la otra persona");
+      text=`${debtorName} debe ${formatMoney(Math.abs(diff))} a ${creditorName}`;
+    }
+    balanceEl.innerHTML=`<span>Liquidación</span><strong>${escapeHtml(text)}</strong>`;
+  } else {
+    balanceEl.innerHTML=`<span>Liquidación</span><strong>Cada una: ${formatMoney(half)}</strong>`;
+  }
+
+  const categoryNames={luz:"Luz",agua:"Agua",limpieza:"Limpieza",otros:"Otros"};
+  $("expenseList").innerHTML=rows.map(e=>{
+    const payer=e.paidBy===state.user.uid?"Tú":(memberNames[e.paidBy]||"Otra persona");
+    return `<div class="expense-row">
+      <div class="expense-icon">${e.category==="luz"?"💡":e.category==="agua"?"💧":e.category==="limpieza"?"🧹":"🧾"}</div>
+      <div class="expense-main">
+        <strong>${escapeHtml(categoryNames[e.category]||"Otros")}</strong>
+        <small>${escapeHtml(e.note||"Sin nota")} · pagado por ${escapeHtml(payer)}</small>
+      </div>
+      <strong class="expense-amount">${formatMoney(e.amount)}</strong>
+      ${e.paidBy===state.user.uid?`<button class="expense-delete ghost" data-expense="${e.id}" aria-label="Eliminar gasto">×</button>`:""}
+    </div>`;
+  }).join("");
+
+  document.querySelectorAll(".expense-delete").forEach(btn=>{
+    btn.addEventListener("click",async()=>{
+      try{
+        await deleteDoc(doc(db,"homes",state.homeId,"expenses",btn.dataset.expense));
+        showStatus("Gasto eliminado.");
+      }catch(err){showStatus(friendlyError(err),true);}
+    });
+  });
+}
+
+$("prevExpenseMonth").addEventListener("click",()=>{
+  state.expenseMonth.setMonth(state.expenseMonth.getMonth()-1);
+  renderExpenses();
+});
+
+$("nextExpenseMonth").addEventListener("click",()=>{
+  state.expenseMonth.setMonth(state.expenseMonth.getMonth()+1);
+  renderExpenses();
+});
+
+$("addExpenseBtn").addEventListener("click",async()=>{
+  const amount=Number(String($("expenseAmount").value).replace(",","."));
+  if(!Number.isFinite(amount)||amount<=0){
+    showStatus("Introduce un importe válido.",true);
+    return;
+  }
+  const category=$("expenseCategory").value;
+  const note=$("expenseNote").value.trim();
+  const date=new Date();
+  const month=expenseMonthKey();
+  try{
+    await addDoc(collection(db,"homes",state.homeId,"expenses"),{
+      category, amount:Math.round(amount*100)/100, note,
+      month, date:keyDate(date), paidBy:state.user.uid,
+      paidByName:auth.currentUser.displayName||auth.currentUser.email,
+      createdAt:serverTimestamp()
+    });
+    $("expenseAmount").value="";
+    $("expenseNote").value="";
+    showStatus("Gasto añadido.");
+  }catch(err){showStatus(friendlyError(err),true);}
 });
 
 function groupReservations(rows){

@@ -16,14 +16,14 @@
       <div class="brand-lockup"><img src="./logo-192.png" alt="ZeroStressHome" class="brand-logo"><div>
         <div class="eyebrow">CASA MADRID</div>
         <h1>ZeroStressHome</h1>
-        <p class="subtitle">Bravo Murillo 307 5F · calendario compartido</p>
+        <p class="subtitle">Bravo Murillo 307 · calendario compartido</p>
       </div></div>
       <button id="logoutBtn" class="ghost hidden">Salir</button>
     </header>
 
     <section id="authView" class="card auth-card">
       <div class="home-icon">🏠</div>
-      <h2>Nuestra casa en Madrid</h2>
+      <h2>La casa, sin líos</h2>
       <p>Reserva tus días y verás inmediatamente los de la otra persona.</p>
 
       <div class="tabs">
@@ -139,6 +139,55 @@
         </div>
         <div id="reservationList" class="reservation-list"></div>
       </div>
+
+      <section class="card expenses-card">
+        <div class="section-head">
+          <div>
+            <div class="eyebrow">GASTOS DEL MES</div>
+            <h2 id="expensesMonthTitle">Gastos de septiembre 2026</h2>
+            <p class="section-subtitle">Luz, agua, limpieza y otros gastos de la casa. Todo lo que se añada aquí lo veréis las dos.</p>
+          </div>
+          <div class="month-switcher">
+            <button id="prevExpenseMonth" class="round" aria-label="Mes anterior">‹</button>
+            <button id="nextExpenseMonth" class="round" aria-label="Mes siguiente">›</button>
+          </div>
+        </div>
+
+        <div class="expense-summary">
+          <div class="expense-total">
+            <span>Total del mes</span>
+            <strong id="expensesTotal">0,00 €</strong>
+          </div>
+          <div class="expense-half">
+            <span>A medias</span>
+            <strong id="expensesHalf">0,00 € cada una</strong>
+          </div>
+          <div id="expenseBalance" class="expense-balance">
+            <span>Liquidación</span>
+            <strong>Sin gastos todavía</strong>
+          </div>
+        </div>
+
+        <div class="expense-form">
+          <label>Tipo
+            <select id="expenseCategory">
+              <option value="luz">Luz</option>
+              <option value="agua">Agua</option>
+              <option value="limpieza">Limpieza</option>
+              <option value="otros">Otros</option>
+            </select>
+          </label>
+          <label>Importe
+            <input id="expenseAmount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0,00">
+          </label>
+          <label>Nota <span class="optional">(opcional)</span>
+            <input id="expenseNote" type="text" maxlength="80" placeholder="Ej. factura agosto">
+          </label>
+          <button id="addExpenseBtn" class="primary">Añadir gasto</button>
+        </div>
+
+        <div id="expenseList" class="expense-list"></div>
+      </section>
 
       <div id="statusMessage" class="toast"></div>
     </section>

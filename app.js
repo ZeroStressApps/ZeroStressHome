@@ -1,7 +1,8 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
 import {
   getAuth, onAuthStateChanged, createUserWithEmailAndPassword,
-  signInWithEmailAndPassword, updateProfile, signOut
+  signInWithEmailAndPassword, updateProfile, signOut,
+  setPersistence, browserLocalPersistence
 } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
 import {
   getFirestore, doc, setDoc, getDoc, collection, query, orderBy,
@@ -12,6 +13,14 @@ import { firebaseConfig } from "./firebase-config.js";
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+
+// Mantener la sesión iniciada en este dispositivo.
+// En navegación privada/incógnito, el navegador puede borrar la sesión al cerrar.
+const authPersistenceReady = setPersistence(auth, browserLocalPersistence);
+
+// Recordar el email para no tener que escribirlo cada vez.
+const savedEmail = localStorage.getItem("zerostresshome_email");
+if (savedEmail) $("emailInput").value = savedEmail;
 
 const $ = (id) => document.getElementById(id);
 const state = {
@@ -39,11 +48,21 @@ function switchAuthMode(mode){
 }
 document.querySelectorAll("[data-auth-tab]").forEach(b=>b.addEventListener("click",()=>switchAuthMode(b.dataset.authTab)));
 
+$("togglePasswordBtn").addEventListener("click",()=>{
+  const input=$("passwordInput");
+  const showing=input.type==="text";
+  input.type=showing?"password":"text";
+  $("togglePasswordBtn").textContent=showing?"Ver":"Ocultar";
+  $("togglePasswordBtn").setAttribute("aria-label",showing?"Mostrar contraseña":"Ocultar contraseña");
+});
+
 $("authForm").addEventListener("submit", async e=>{
   e.preventDefault();
   const email=$("emailInput").value.trim();
   const password=$("passwordInput").value;
   try{
+    await authPersistenceReady;
+    localStorage.setItem("zerostresshome_email", email);
     if(state.authMode==="register"){
       const name=$("nameInput").value.trim();
       if(!name) throw new Error("Escribe tu nombre.");

@@ -16,14 +16,14 @@
       <div class="brand-lockup"><img src="./logo-192.png" alt="ZeroStressHome" class="brand-logo"><div>
         <div class="eyebrow">CASA MADRID</div>
         <h1>ZeroStressHome</h1>
-        <p class="subtitle">Bravo Murillo 307 5F · calendario compartido</p>
+        <p class="subtitle">Bravo Murillo 307 · calendario compartido</p>
       </div></div>
       <button id="logoutBtn" class="ghost hidden">Salir</button>
     </header>
 
     <section id="authView" class="card auth-card">
       <div class="home-icon">🏠</div>
-      <h2>Nuestra casa en Madrid</h2>
+      <h2>La casa, sin líos</h2>
       <p>Reserva tus días y verás inmediatamente los de la otra persona.</p>
 
       <div class="tabs">
@@ -39,8 +39,12 @@
           <input id="emailInput" type="email" autocomplete="email" required placeholder="tu@email.com">
         </label>
         <label>Contraseña
-          <input id="passwordInput" type="password" autocomplete="current-password" required minlength="6" placeholder="Mínimo 6 caracteres">
+          <span class="password-wrap">
+            <input id="passwordInput" type="password" autocomplete="current-password" required minlength="6" placeholder="Mínimo 6 caracteres">
+            <button type="button" id="togglePasswordBtn" class="password-toggle" aria-label="Mostrar contraseña">Ver</button>
+          </span>
         </label>
+        <p class="login-note">Tu sesión se mantendrá iniciada en este dispositivo. El navegador puede guardar la contraseña de forma segura.</p>
         <button class="primary" type="submit" id="authSubmit">Entrar</button>
         <p id="authMessage" class="message"></p>
       </form>

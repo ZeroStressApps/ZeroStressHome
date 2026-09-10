@@ -2,3 +2,8 @@
 
 .date-range{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;max-width:440px}.date-range label{margin:0;color:#756b80;font-size:11px}.date-range input{margin-top:5px;padding:10px}.selection-content{flex:1}.day.in-range{box-shadow:inset 0 -5px 0 #e7dcff}.day.range-start,.day.range-end{outline:3px solid #7c3aed;outline-offset:1px}.day.range-start{border-top-left-radius:18px;border-bottom-left-radius:18px}.day.range-end{border-top-right-radius:18px;border-bottom-right-radius:18px}.selected-card .primary{min-width:170px}.reservation-row strong{font-size:13px}
 @media(max-width:580px){.date-range{grid-template-columns:1fr 1fr;max-width:none}.selected-card .primary{min-width:0}}
+
+.password-wrap{position:relative;display:block}
+.password-wrap input{padding-right:64px}
+.password-toggle{position:absolute;right:7px;top:50%;transform:translateY(-50%);border:0;border-radius:9px;padding:7px 9px;background:#f0e9ff;color:#6d28d9;font-weight:800;font-size:12px;cursor:pointer}
+.login-note{font-size:11px!important;color:#817687!important;margin:8px 0 0!important}

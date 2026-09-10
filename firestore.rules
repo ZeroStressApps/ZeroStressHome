@@ -28,6 +28,21 @@ service cloud.firestore {
                .data.members.hasAny([request.auth.uid]);
       }
 
+      match /expenseMonths/{monthId} {
+        allow read: if signedIn()
+          && get(/databases/$(database)/documents/homes/$(homeId))
+               .data.members.hasAny([request.auth.uid]);
+
+        allow create, update: if signedIn()
+          && get(/databases/$(database)/documents/homes/$(homeId))
+               .data.members.hasAny([request.auth.uid])
+          && request.resource.data.paidBy == request.auth.uid;
+
+        allow delete: if signedIn()
+          && get(/databases/$(database)/documents/homes/$(homeId))
+               .data.members.hasAny([request.auth.uid]);
+      }
+
       match /expenses/{expenseId} {
         allow read: if signedIn()
           && get(/databases/$(database)/documents/homes/$(homeId))

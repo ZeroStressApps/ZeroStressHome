@@ -27,7 +27,7 @@ const $ = (id) => document.getElementById(id);
 const state = {
   user: null, homeId: null, home: null, reservations: [], expenses: [],
   current: new Date(), selected: null, selectedStart: null, selectedEnd: null,
-  unsubscribe: null, expenseUnsubscribe: null, authMode: "login",
+  unsubscribe: null, expenseUnsubscribe: null, expenseMonthStatus: null, authMode: "login",
   expenseMonth: new Date()
 };
 
@@ -298,6 +298,47 @@ function formatMoney(n){
   return Number(n||0).toLocaleString("es-ES",{minimumFractionDigits:2,maximumFractionDigits:2})+" €";
 }
 
+
+function expenseMonthDoc(){
+  return doc(db,"homes",state.homeId,"expenseMonths",expenseMonthKey());
+}
+
+async function loadExpenseMonthStatus(){
+  try{
+    const snap=await getDoc(expenseMonthDoc());
+    state.expenseMonthStatus=snap.exists()?snap.data():null;
+    renderExpenses();
+  }catch(err){
+    showStatus(friendlyError(err),true);
+  }
+}
+
+function renderPaidStatus(rows,total){
+  const paid=!!state.expenseMonthStatus?.paid;
+  const title=$("expensePaidTitle");
+  const text=$("expensePaidText");
+  const button=$("markMonthPaidBtn");
+  const box=$("expensePaidStatus");
+
+  if(paid){
+    box.classList.add("is-paid");
+    title.textContent="Mes pagado ✓";
+    text.textContent=`Deuda saldada · ${formatMoney(total/2)} correspondiente a la otra persona.`;
+    button.textContent="Marcar como pendiente";
+    button.classList.add("ghost");
+    button.classList.remove("secondary");
+  }else{
+    box.classList.remove("is-paid");
+    title.textContent=rows.length?"Mes pendiente de pago":"Mes sin gastos";
+    text.textContent=rows.length
+      ? `Pendiente: ${formatMoney(total/2)} que debe abonar la otra persona.`
+      : "Cuando haya gastos y Marta te haga el Bizum, podrás marcar el mes como pagado.";
+    button.textContent="Marcar mes como pagado";
+    button.classList.add("secondary");
+    button.classList.remove("ghost");
+  }
+}
+
 function subscribeExpenses(){
   if(state.expenseUnsubscribe) state.expenseUnsubscribe();
   const q=query(
@@ -306,7 +347,7 @@ function subscribeExpenses(){
   );
   state.expenseUnsubscribe=onSnapshot(q,snap=>{
     state.expenses=snap.docs.map(d=>({id:d.id,...d.data()}));
-    renderExpenses();
+    loadExpenseMonthStatus();
   },err=>showStatus(friendlyError(err),true));
 }
 
@@ -318,6 +359,7 @@ function renderExpenses(){
   const half=total/2;
   $("expensesTotal").textContent=formatMoney(total);
   $("expensesHalf").textContent=`${formatMoney(half)} cada una`;
+  renderPaidStatus(rows,total);
 
   const members=state.home?.members||[];
   const memberNames=state.home?.memberNames||{};
@@ -376,12 +418,45 @@ function renderExpenses(){
 
 $("prevExpenseMonth").addEventListener("click",()=>{
   state.expenseMonth.setMonth(state.expenseMonth.getMonth()-1);
+  state.expenseMonthStatus=null;
   renderExpenses();
+  loadExpenseMonthStatus();
 });
 
 $("nextExpenseMonth").addEventListener("click",()=>{
   state.expenseMonth.setMonth(state.expenseMonth.getMonth()+1);
+  state.expenseMonthStatus=null;
   renderExpenses();
+  loadExpenseMonthStatus();
+});
+
+
+$("markMonthPaidBtn").addEventListener("click",async()=>{
+  const key=expenseMonthKey();
+  const rows=(state.expenses||[]).filter(e=>(e.month||String(e.date||"").slice(0,7))===key);
+  const total=rows.reduce((sum,e)=>sum+Number(e.amount||0),0);
+  if(!rows.length){
+    showStatus("No hay gastos en este mes.",true);
+    return;
+  }
+  const currentlyPaid=!!state.expenseMonthStatus?.paid;
+  try{
+    if(currentlyPaid){
+      await deleteDoc(expenseMonthDoc());
+      state.expenseMonthStatus=null;
+      showStatus("El mes vuelve a quedar pendiente.");
+    }else{
+      await setDoc(expenseMonthDoc(),{
+        paid:true,
+        paidAt:serverTimestamp(),
+        paidBy:state.user.uid,
+        amountDue:Math.round((total/2)*100)/100
+      });
+      state.expenseMonthStatus={paid:true,amountDue:Math.round((total/2)*100)/100};
+      showStatus("Mes marcado como pagado ✓");
+    }
+    renderExpenses();
+  }catch(err){showStatus(friendlyError(err),true);}
 });
 
 $("addExpenseBtn").addEventListener("click",async()=>{

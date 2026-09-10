@@ -34,3 +34,16 @@
   .expense-form label:nth-child(3){grid-column:span 2}
   .expense-form button{grid-column:span 2}
 }
+
+.expense-paid-status{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:12px 0 2px;padding:12px 14px;border:1px solid #e8e1ed;border-radius:15px;background:#fbf9fc}
+.expense-paid-status>div{display:flex;align-items:center;gap:10px}
+.paid-check{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:#e8e2ed;color:#8a8190;font-weight:900}
+.expense-paid-status strong{display:block;font-size:13px;color:#302b3b}
+.expense-paid-status small{display:block;margin-top:2px;color:#817687;font-size:11px}
+.expense-paid-status.is-paid{border-color:#b9dfc6;background:#f2fbf4}
+.expense-paid-status.is-paid .paid-check{background:#25a35a;color:white}
+.expense-paid-status.is-paid strong{color:#18743c}
+@media(max-width:720px){
+  .expense-paid-status{align-items:stretch;flex-direction:column}
+  .expense-paid-status button{width:100%}
+}

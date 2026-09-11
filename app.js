@@ -15,15 +15,15 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+const $ = (id) => document.getElementById(id);
+
 // Mantener la sesión iniciada en este dispositivo.
 // En navegación privada/incógnito, el navegador puede borrar la sesión al cerrar.
 const authPersistenceReady = setPersistence(auth, browserLocalPersistence);
 
 // Recordar el email para no tener que escribirlo cada vez.
 const savedEmail = localStorage.getItem("zerostresshome_email");
-if (savedEmail) $("emailInput").value = savedEmail;
-
-const $ = (id) => document.getElementById(id);
+if (savedEmail && $("emailInput")) $("emailInput").value = savedEmail;
 const state = {
   user: null, homeId: null, home: null, reservations: [], expenses: [],
   current: new Date(), selected: null, selectedStart: null, selectedEnd: null,
